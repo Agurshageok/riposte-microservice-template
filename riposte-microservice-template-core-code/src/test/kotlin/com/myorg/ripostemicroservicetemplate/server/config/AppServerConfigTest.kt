@@ -4,28 +4,37 @@ import com.google.inject.Module
 import com.google.inject.util.Modules
 import com.google.inject.util.Providers
 import com.myorg.ripostemicroservicetemplate.server.config.guice.AppGuiceModule
+import com.myorg.ripostemicroservicetemplate.server.config.guice.GuiceProvidedServerConfigValues
 import com.myorg.ripostemicroservicetemplate.testutils.TestUtils.APP_ID
+import com.myorg.ripostemicroservicetemplate.testutils.TestUtils.Whitebox
+import com.nhaarman.mockitokotlin2.mock
 import com.nike.backstopper.handler.riposte.RiposteApiExceptionHandler
 import com.nike.backstopper.handler.riposte.RiposteUnhandledExceptionHandler
 import com.nike.backstopper.service.riposte.BackstopperRiposteValidatorAdapter
 import com.nike.riposte.metrics.codahale.CodahaleMetricsListener
 import com.nike.riposte.metrics.codahale.impl.EndpointMetricsHandlerDefaultImpl
 import com.nike.riposte.server.error.validation.BasicAuthSecurityValidator
+import com.nike.riposte.server.hooks.PostServerStartupHook
+import com.nike.riposte.server.hooks.ServerShutdownHook
 import com.nike.riposte.typesafeconfig.util.TypesafeConfigUtil
+import com.tngtech.java.junit.dataprovider.DataProvider
+import com.tngtech.java.junit.dataprovider.DataProviderRunner
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigValueFactory
 import dev.misfitlabs.kotlinguice4.typeLiteral
-import java.util.ArrayList
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import java.util.ArrayList
 
 /**
  * Tests the functionality of [AppServerConfig]
  *
  * @author Nic Munroe
  */
+@RunWith(DataProviderRunner::class)
 class AppServerConfigTest {
 
     private var configForTesting: Config? = null
@@ -46,8 +55,8 @@ class AppServerConfigTest {
 
         // then
         assertThat(thrown)
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("appConfig")
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("appConfig")
     }
 
     @Test
@@ -70,14 +79,14 @@ class AppServerConfigTest {
                 val appModule = getModuleOfType(modules, AppGuiceModule::class.java)
                 modules.remove(appModule)
                 modules.add(
-                        Modules.override(AppGuiceModule(configForTesting))
-                                .with(
-                                        Module {
-                                            binder ->
-                                            binder.bind(typeLiteral<CodahaleMetricsListener>())
-                                                    .toProvider(Providers.of<CodahaleMetricsListener>(null))
-                                        }
-                                )
+                    Modules.override(AppGuiceModule(configForTesting))
+                        .with(
+                            Module {
+                                binder ->
+                                binder.bind(typeLiteral<CodahaleMetricsListener>())
+                                    .toProvider(Providers.of<CodahaleMetricsListener>(null))
+                            }
+                        )
                 )
 
                 return modules
@@ -97,11 +106,11 @@ class AppServerConfigTest {
     fun a_BackstopperRiposteConfigGuiceModule_is_used_to_setup_error_handlers_and_validators() {
         // expect
         assertThat(appServerConfig!!.riposteErrorHandler())
-                .isInstanceOf(RiposteApiExceptionHandler::class.java)
+            .isInstanceOf(RiposteApiExceptionHandler::class.java)
         assertThat(appServerConfig!!.riposteUnhandledErrorHandler())
-                .isInstanceOf(RiposteUnhandledExceptionHandler::class.java)
+            .isInstanceOf(RiposteUnhandledExceptionHandler::class.java)
         assertThat(appServerConfig!!.requestContentValidationService())
-                .isInstanceOf(BackstopperRiposteValidatorAdapter::class.java)
+            .isInstanceOf(BackstopperRiposteValidatorAdapter::class.java)
     }
 
     @Test
@@ -120,7 +129,7 @@ class AppServerConfigTest {
 
         // then
         assertThat(obj).isNotNull
-        assertThat(obj.join()).isNotNull()
+        assertThat(obj!!.join()).isNotNull()
     }
 
     @Test
@@ -136,9 +145,9 @@ class AppServerConfigTest {
     fun metricsListener_returns_null_object_if_no_metrics_reporters_are_enabled() {
         // given
         val configNoReporters = TypesafeConfigUtil.loadConfigForAppIdAndEnvironment(APP_ID, "compiletimetest")
-                .withValue("metrics.slf4j.reporting.enabled", ConfigValueFactory.fromAnyRef(false))
-                .withValue("metrics.graphite.reporting.enabled", ConfigValueFactory.fromAnyRef(false))
-                .withValue("metrics.jmx.reporting.enabled", ConfigValueFactory.fromAnyRef(false))
+            .withValue("metrics.slf4j.reporting.enabled", ConfigValueFactory.fromAnyRef(false))
+            .withValue("metrics.graphite.reporting.enabled", ConfigValueFactory.fromAnyRef(false))
+            .withValue("metrics.jmx.reporting.enabled", ConfigValueFactory.fromAnyRef(false))
         val asc = AppServerConfig(configNoReporters)
 
         // when
@@ -155,15 +164,15 @@ class AppServerConfigTest {
 
         // expect
         assertThat(asc.requestSecurityValidator())
-                .isNotNull()
-                .isInstanceOf(BasicAuthSecurityValidator::class.java)
+            .isNotNull()
+            .isInstanceOf(BasicAuthSecurityValidator::class.java)
     }
 
     @Test
     fun isDebugActionsEnabled_comes_from_config() {
         // expect
         assertThat(appServerConfig!!.isDebugActionsEnabled)
-                .isEqualTo(configForTesting!!.getBoolean("debugActionsEnabled"))
+            .isEqualTo(configForTesting!!.getBoolean("debugActionsEnabled"))
     }
 
     @Test
@@ -176,5 +185,63 @@ class AppServerConfigTest {
     fun endpointsSslPort_comes_from_config() {
         // expect
         assertThat(appServerConfig!!.endpointsSslPort()).isEqualTo(configForTesting!!.getInt("endpoints.sslPort"))
+    }
+
+    @DataProvider(
+        value = [
+            "true",
+            "false"
+        ]
+    )
+    @Test
+    fun postServerStartupHooks_works_as_expected(eurekaStartupHookIsNull: Boolean) {
+        // given
+        val eurekaStartupHook: PostServerStartupHook? = if (eurekaStartupHookIsNull) null else mock()
+        val guiceValues: GuiceProvidedServerConfigValues =
+            Whitebox.getInternalState(appServerConfig!!, "guiceValues") as GuiceProvidedServerConfigValues
+        Whitebox.setInternalState(
+            guiceValues.eurekaServerHooks, "eurekaStartupHook", eurekaStartupHook
+        )
+
+        // when
+        val result: List<PostServerStartupHook>? = appServerConfig!!.postServerStartupHooks()
+
+        // then
+        if (eurekaStartupHookIsNull) {
+            assertThat(result).isNull()
+        } else {
+            assertThat(result)
+                .isNotNull
+                .containsExactly(eurekaStartupHook)
+        }
+    }
+
+    @DataProvider(
+        value = [
+            "true",
+            "false"
+        ]
+    )
+    @Test
+    fun serverShutdownHooks_works_as_expected(eurekaShutdownHookIsNull: Boolean) {
+        // given
+        val eurekaShutdownHook: ServerShutdownHook? = if (eurekaShutdownHookIsNull) null else mock()
+        val guiceValues: GuiceProvidedServerConfigValues =
+            Whitebox.getInternalState(appServerConfig!!, "guiceValues") as GuiceProvidedServerConfigValues
+        Whitebox.setInternalState(
+            guiceValues.eurekaServerHooks, "eurekaShutdownHook", eurekaShutdownHook
+        )
+
+        // when
+        val result: List<ServerShutdownHook>? = appServerConfig!!.serverShutdownHooks()
+
+        // then
+        if (eurekaShutdownHookIsNull) {
+            assertThat(result).isNull()
+        } else {
+            assertThat(result)
+                .isNotNull
+                .containsExactly(eurekaShutdownHook)
+        }
     }
 }

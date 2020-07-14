@@ -1,6 +1,6 @@
 package com.myorg.ripostemicroservicetemplate.endpoints
 
-import com.myorg.ripostemicroservicetemplate.server.config.guice.AppGuiceModule
+import com.myorg.ripostemicroservicetemplate.server.config.guice.AppSecurityGuiceModule
 import com.nike.riposte.server.http.RequestInfo
 import com.nike.riposte.server.http.ResponseInfo
 import com.nike.riposte.server.http.StandardEndpoint
@@ -30,7 +30,7 @@ import javax.inject.Named
  *
  * In a real production application you may want to protect all endpoints except `/healthcheck`. For the examples
  * only `POST /exampleBasicAuth` is protected. See the comments and implementation of
- * [AppGuiceModule.basicAuthProtectedEndpoints] to see how to switch to protect all endpoints except `/healthcheck`.
+ * [AppSecurityGuiceModule.authProtectedEndpoints] to see how to switch to protect all endpoints except `/healthcheck`.
  *
  * TODO: EXAMPLE CLEANUP - Delete this class.
  *
@@ -52,9 +52,9 @@ object ExampleBasicAuthProtectedEndpoint {
 
         private val matcher: Matcher = Matcher.match(MATCHING_PATH, HttpMethod.GET)
         private val basicAuthHeaderValueRequired: String =
-                "Basic " + Base64.getEncoder().encodeToString(
-                        ("$basicAuthUsername:$basicAuthPassword").toByteArray(CharsetUtil.UTF_8)
-                )
+            "Basic " + Base64.getEncoder().encodeToString(
+                ("$basicAuthUsername:$basicAuthPassword").toByteArray(CharsetUtil.UTF_8)
+            )
 
         override fun execute(
             request: RequestInfo<Void>,
@@ -64,11 +64,11 @@ object ExampleBasicAuthProtectedEndpoint {
 
             val responseData = LinkedHashMap<String, String>()
             responseData["description"] = "The following Authorization header can be used to call " +
-                    "POST $MATCHING_PATH without a validation error."
+                "POST $MATCHING_PATH without a validation error."
             responseData[HttpHeaderNames.AUTHORIZATION.toString()] = basicAuthHeaderValueRequired
 
             return CompletableFuture.completedFuture(
-                    ResponseInfo.newBuilder<Map<String, String>>(responseData).build()
+                ResponseInfo.newBuilder<Map<String, String>>(responseData).build()
             )
         }
 
@@ -91,10 +91,10 @@ object ExampleBasicAuthProtectedEndpoint {
         ): CompletableFuture<ResponseInfo<String>> {
 
             return CompletableFuture.completedFuture(
-                    ResponseInfo.newBuilder("Successful Basic Auth call")
-                            .withHttpStatusCode(HttpResponseStatus.CREATED.code())
-                            .withDesiredContentWriterMimeType("text/plain")
-                            .build()
+                ResponseInfo.newBuilder("Successful Basic Auth call")
+                    .withHttpStatusCode(HttpResponseStatus.CREATED.code())
+                    .withDesiredContentWriterMimeType("text/plain")
+                    .build()
             )
         }
 
